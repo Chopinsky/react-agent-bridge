@@ -1,4 +1,5 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useContext, useCallback, useRef } from 'react';
+import { useSyncExternalStore } from 'react';
 import { AgentBridgeCtx, RegistryHandle } from '../core/AgentBridgeContext';
 
 export interface AgentStore<T extends Record<string, unknown>> {
@@ -51,17 +52,30 @@ export function createAgentStore<T extends Record<string, unknown>>(
     use<K extends keyof T>(key: K): T[K] {
       const ctx = useContext(AgentBridgeCtx);
       const fullKey = makeKey(key);
-      const [value, setValue] = useState<T[K]>(() => initial[key]);
+
+      const subscribe = useCallback(
+        (cb: () => void) => {
+          if (!ctx) return () => {};
+          return ctx.subscribe(fullKey, cb);
+        },
+        [fullKey, ctx]
+      );
+
+      const getSnapshot = useCallback(
+        () => ctx?.getStateValue(fullKey) as T[K] | undefined,
+        [fullKey, ctx]
+      );
+
+      const registryValue = useSyncExternalStore(subscribe, getSnapshot);
+      const value: T[K] = registryValue !== undefined ? registryValue : initial[key];
 
       useEffect(() => {
         if (!ctx) return;
         registerAllKeys(ctx);
-        const unsub = ctx.subscribe(fullKey, (v: unknown) => setValue(v as T[K]));
         return () => {
-          unsub();
           ctx.unregisterStateEntry(fullKey);
         };
-      }, []);
+      }, [fullKey, ctx]);
 
       return value;
     },

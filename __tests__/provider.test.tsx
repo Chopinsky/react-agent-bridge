@@ -1,8 +1,9 @@
 import React from 'react';
 import { render, act, screen } from '@testing-library/react';
 import { AgentBridgeProvider } from '../src/provider';
-import { useAgentState } from '../src/hooks/useAgentState';
+import { useAgentState, useAgentStateValue, useSetAgentState } from '../src/hooks/useAgentState';
 import { useAgentAction } from '../src/hooks/useAgentAction';
+import { defineAgentAction } from '../src/actions/defineAgentAction';
 import { createAgentStore } from '../src/hooks/createAgentStore';
 import { agentAtom, useAgentAtom } from '../src/hooks/agentAtom';
 import { useAgentReducer } from '../src/hooks/useAgentReducer';
@@ -177,6 +178,24 @@ describe('useAgentReducer', () => {
     );
     expect((globalThis as any).__AGENT__.state.get('reducer.key')).toBe(0);
   });
+
+  test('lazy initializer is not called eagerly', () => {
+    const initFn = jest.fn(() => 42);
+    function reducer(state: number, action: string): number {
+      return action === 'inc' ? state + 1 : state;
+    }
+    function TestComp() {
+      const [count] = useAgentReducer('lazy.key', reducer, initFn);
+      return <div>{count}</div>;
+    }
+    render(
+      <AgentBridgeProvider appId="test" enabled={true}>
+        <TestComp />
+      </AgentBridgeProvider>
+    );
+    expect((globalThis as any).__AGENT__.state.get('lazy.key')).toBe(42);
+    expect(initFn).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('agentAtom + useAgentAtom', () => {
@@ -242,6 +261,71 @@ describe('createAgentStore', () => {
     store.setState('val', 'from-outside');
     expect(store.getState('val')).toBe('from-outside');
     expect((globalThis as any).__AGENT__.state.get('ns.val')).toBe('from-outside');
+  });
+});
+
+describe('registerActions prop', () => {
+  test('module-level actions registered via provider prop', async () => {
+    const myAction = defineAgentAction('module.action', async (input?: unknown) => {
+      return { echoed: input };
+    }, { description: 'module action' });
+    render(
+      <AgentBridgeProvider appId="test" enabled={true} registerActions={[myAction]}>
+        <div />
+      </AgentBridgeProvider>
+    );
+    const result = await (globalThis as any).__AGENT__.actions.invoke('module.action', { x: 1 });
+    expect(result.ok).toBe(true);
+    expect(result.data.echoed).toEqual({ x: 1 });
+  });
+});
+
+describe('useAgentStateValue', () => {
+  test('reads existing state value without setter', () => {
+    function Writer() {
+      const [, setVal] = useAgentState('sv.key', 'initial');
+      return <button onClick={() => setVal('updated')}>write</button>;
+    }
+    function Reader() {
+      const val = useAgentStateValue<string>('sv.key');
+      return <div data-testid="reader">{val}</div>;
+    }
+    render(
+      <AgentBridgeProvider appId="test" enabled={true}>
+        <Writer />
+        <Reader />
+      </AgentBridgeProvider>
+    );
+    expect(screen.getByTestId('reader').textContent).toBe('initial');
+    act(() => { screen.getByText('write').click(); });
+    expect(screen.getByTestId('reader').textContent).toBe('updated');
+  });
+
+  test('returns undefined when used without provider', () => {
+    function TestComp() {
+      const val = useAgentStateValue('missing.key');
+      return <div data-testid="v">{String(val)}</div>;
+    }
+    render(<TestComp />);
+    expect(screen.getByTestId('v').textContent).toBe('undefined');
+  });
+});
+
+describe('useSetAgentState', () => {
+  test('setter updates registry without local state', () => {
+    function Writer() {
+      useAgentState('setter.key', 'start');
+      const setVal = useSetAgentState('setter.key');
+      return <button onClick={() => setVal('done')}>set</button>;
+    }
+    render(
+      <AgentBridgeProvider appId="test" enabled={true}>
+        <Writer />
+      </AgentBridgeProvider>
+    );
+    expect((globalThis as any).__AGENT__.state.get('setter.key')).toBe('start');
+    act(() => { screen.getByText('set').click(); });
+    expect((globalThis as any).__AGENT__.state.get('setter.key')).toBe('done');
   });
 });
 

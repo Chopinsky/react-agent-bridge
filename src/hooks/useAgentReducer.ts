@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useContext, useCallback } from 'react';
+import { useReducer, useEffect, useContext, useRef } from 'react';
 import { AgentBridgeCtx } from '../core/AgentBridgeContext';
 
 export function useAgentReducer<S, A>(
@@ -13,8 +13,11 @@ export function useAgentReducer<S, A>(
   }
 ): [S, React.Dispatch<A>] {
   const ctx = useContext(AgentBridgeCtx);
-  const initState = typeof initial === 'function' ? (initial as () => S)() : initial;
-  const [state, dispatch] = useReducer(reducer, initState);
+  const [state, dispatch] = typeof initial === 'function'
+    ? useReducer(reducer, undefined as S, initial as () => S)
+    : useReducer(reducer, initial);
+
+  const registered = useRef(false);
 
   useEffect(() => {
     if (!ctx) return;
@@ -24,12 +27,15 @@ export function useAgentReducer<S, A>(
       schema: options?.schema,
       redact: options?.redact,
     });
+    registered.current = true;
     return () => {
+      registered.current = false;
       ctx.unregisterStateEntry(key);
     };
-  }, []);
+  }, [key, ctx, options?.serializable, options?.description, options?.schema, options?.redact]);
 
   useEffect(() => {
+    if (!registered.current) return;
     if (ctx) {
       ctx.updateStateValue(key, state);
     }

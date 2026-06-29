@@ -1,4 +1,4 @@
-import {
+import type {
   AgentBridgeConfig,
   ActionContext,
   ActionDescriptor,
@@ -13,8 +13,6 @@ type SubscribeCallback = (value: unknown, key?: string) => void;
 export function createRegistry(config: AgentBridgeConfig) {
   const states = new Map<string, {
     descriptor: StateDescriptor;
-    getValue: () => unknown;
-    setValue: (value: unknown) => void;
     refCount: number;
     value: unknown;
   }>();
@@ -27,10 +25,71 @@ export function createRegistry(config: AgentBridgeConfig) {
   const token = productionRules ? prodConfig.token : undefined;
   const allowlist = productionRules ? prodConfig.allowlist : undefined;
 
+  let batchDepth = 0;
+  const pendingNotifications: Array<{ key: string; value: unknown }> = [];
+
+  function startBatch() {
+    batchDepth++;
+  }
+
+  function endBatch() {
+    if (--batchDepth > 0) return;
+    if (pendingNotifications.length === 0) return;
+    const batch = pendingNotifications.splice(0);
+    const deduped = new Map<string, unknown>();
+    for (const { key, value } of batch) {
+      deduped.set(key, value);
+    }
+    for (const [key, value] of deduped) {
+      notifySubscribers(key, value);
+    }
+  }
+
+  function scheduleNotify(key: string, value: unknown) {
+    if (batchDepth > 0) {
+      pendingNotifications.push({ key, value });
+    } else {
+      notifySubscribers(key, value);
+    }
+  }
+
+  function serializeValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value;
+    if (value instanceof Date) return value.toISOString();
+    if (value instanceof Map) return Array.from(value.entries());
+    if (value instanceof Set) return Array.from(value);
+    if (config.serializers) {
+      for (const [key, fn] of Object.entries(config.serializers)) {
+        if (typeof value === key || (value as any)?.constructor?.name === key) {
+          return fn(value);
+        }
+      }
+    }
+    return value;
+  }
+
+  function validateSchema(schema: Record<string, unknown>, input: unknown): boolean {
+    if (schema.type === 'object') {
+      if (typeof input !== 'object' || input === null) return false;
+      if (Array.isArray(schema.required)) {
+        for (const req of schema.required) {
+          if (!(req in (input as Record<string, unknown>))) return false;
+        }
+      }
+    } else if (schema.type === 'array') {
+      if (!Array.isArray(input)) return false;
+    } else if (schema.type) {
+      const typeMap: Record<string, string> = { string: 'string', number: 'number', boolean: 'boolean', integer: 'number' };
+      if (typeof input !== typeMap[schema.type as string]) return false;
+    }
+    return true;
+  }
+
   function isAllowed(key: string, type: 'states' | 'actions'): boolean {
     if (!productionRules) return true;
     const list = allowlist?.[type];
-    if (!list || list.length === 0) return true;
+    if (!list) return true;
+    if (list.length === 0) return false;
     return list.includes(key);
   }
 
@@ -70,12 +129,6 @@ export function createRegistry(config: AgentBridgeConfig) {
           updatedAt: now,
           version: 1,
         },
-        getValue: () => entry.value,
-        setValue: (v: unknown) => {
-          entry.value = v;
-          entry.descriptor.version++;
-          entry.descriptor.updatedAt = Date.now();
-        },
         refCount: 1,
       };
       states.set(key, entry);
@@ -106,14 +159,17 @@ export function createRegistry(config: AgentBridgeConfig) {
       entry.value = value;
       entry.descriptor.version++;
       entry.descriptor.updatedAt = Date.now();
-      notifySubscribers(key, value);
+      scheduleNotify(key, value);
     },
 
     getSnapshot(): Record<string, unknown> {
       const snapshot: Record<string, unknown> = {};
       for (const [key, entry] of states) {
-        if (entry.descriptor.serializable && !entry.descriptor.redacted) {
-          snapshot[key] = entry.value;
+        if (!entry.descriptor.serializable) continue;
+        if (entry.descriptor.redacted) {
+          snapshot[key] = '[REDACTED]';
+        } else {
+          snapshot[key] = serializeValue(entry.value);
         }
       }
       return snapshot;
@@ -163,8 +219,7 @@ export function createRegistry(config: AgentBridgeConfig) {
       if (!config.enabled) {
         return { ok: false, error: { code: 'DISABLED', message: 'Agent bridge disabled' } };
       }
-      const isProd = config.env === 'production';
-      if (isProd && !productionRules) {
+      if (config.env === 'production' && !productionRules) {
         return { ok: false, error: { code: 'DISABLED', message: 'Agent bridge disabled in production' } };
       }
       if (token && options?.token !== token) {
@@ -174,6 +229,12 @@ export function createRegistry(config: AgentBridgeConfig) {
       if (!entry) {
         return { ok: false, error: { code: 'NOT_FOUND', message: `Action "${name}" not found` } };
       }
+      if (entry.descriptor.inputSchema && input !== undefined) {
+        if (!validateSchema(entry.descriptor.inputSchema, input)) {
+          return { ok: false, error: { code: 'VALIDATION', message: `Invalid input for action "${name}"` } };
+        }
+      }
+      startBatch();
       try {
         const ctx: ActionContext = {
           signal: new AbortController().signal,
@@ -186,6 +247,8 @@ export function createRegistry(config: AgentBridgeConfig) {
           return { ok: false, error: { code: err.code, message: err.message, details: err.details } };
         }
         return { ok: false, error: { code: 'INTERNAL', message: String(err?.message ?? err) } };
+      } finally {
+        endBatch();
       }
     },
 
@@ -209,8 +272,8 @@ export function createRegistry(config: AgentBridgeConfig) {
 
     getInternalRegistry(): InternalRegistry {
       return {
-        states: states as any,
-        actions: actions as any,
+        states,
+        actions,
         config,
       };
     },

@@ -204,4 +204,156 @@ describe('Registry', () => {
     expect(list['a1'].description).toBe('alpha');
     expect(list['b2'].description).toBe('beta');
   });
+
+  test('invokeAction validates input against schema and rejects invalid', async () => {
+    const registry = createRegistry(baseConfig);
+    registry.registerActionEntry('validated', async (input) => input, {
+      inputSchema: { type: 'object', required: ['name'] },
+    });
+    const valid = await registry.invokeAction('validated', { name: 'Alice' });
+    expect(valid.ok).toBe(true);
+    const invalid = await registry.invokeAction('validated', { age: 30 });
+    expect(invalid.ok).toBe(false);
+    expect(invalid.error?.code).toBe('VALIDATION');
+  });
+
+  test('getSnapshot returns [REDACTED] for redacted entries', () => {
+    const registry = createRegistry(baseConfig);
+    registry.registerStateEntry('public', 'visible', { serializable: true });
+    registry.registerStateEntry('secret', 'hidden', { serializable: true, redact: true });
+    const snapshot = registry.getSnapshot();
+    expect(snapshot.public).toBe('visible');
+    expect(snapshot.secret).toBe('[REDACTED]');
+  });
+
+  test('getSnapshot excludes non-serializable entries', () => {
+    const registry = createRegistry(baseConfig);
+    registry.registerStateEntry('serial', 'ok', { serializable: true });
+    registry.registerStateEntry('nonserial', 'skip', { serializable: false });
+    const snapshot = registry.getSnapshot();
+    expect(snapshot.serial).toBe('ok');
+    expect(snapshot.nonserial).toBeUndefined();
+  });
+
+  test('empty allowlist denies all entries', () => {
+    const config = {
+      ...baseConfig,
+      production: { enabled: true, token: 'tok', allowlist: { states: [], actions: [] } },
+    };
+    const registry = createRegistry(config);
+    registry.registerStateEntry('any.key', 'val', { serializable: true });
+    expect(registry.getStateDescriptor('any.key')).toBeUndefined();
+    registry.registerActionEntry('any.action', async () => null, {});
+    expect(registry.getActionDescriptor('any.action')).toBeUndefined();
+  });
+
+  test('serializeValue serializes Date, Map, Set in snapshot', () => {
+    const registry = createRegistry(baseConfig);
+    const now = new Date('2026-01-01T00:00:00Z');
+    const map = new Map([['a', 1]]);
+    const set = new Set([1, 2, 3]);
+    registry.registerStateEntry('d', now, { serializable: true });
+    registry.registerStateEntry('m', map, { serializable: true });
+    registry.registerStateEntry('s', set, { serializable: true });
+    const snapshot = registry.getSnapshot();
+    expect(snapshot.d).toBe('2026-01-01T00:00:00.000Z');
+    expect(snapshot.m).toEqual([['a', 1]]);
+    expect(snapshot.s).toEqual([1, 2, 3]);
+  });
+
+  test('invokeAction with array type validation', async () => {
+    const registry = createRegistry(baseConfig);
+    registry.registerActionEntry('arr', async (input) => input, {
+      inputSchema: { type: 'array' },
+    });
+    const valid = await registry.invokeAction('arr', [1, 2, 3]);
+    expect(valid.ok).toBe(true);
+    const invalid = await registry.invokeAction('arr', 'not-array');
+    expect(invalid.ok).toBe(false);
+    expect(invalid.error?.code).toBe('VALIDATION');
+  });
+
+  describe('action-scoped notification batching', () => {
+    test('batches multiple state updates from a single action', async () => {
+      const registry = createRegistry(baseConfig);
+      registry.registerStateEntry('a', 0, { serializable: true });
+      registry.registerStateEntry('b', 0, { serializable: true });
+      const received: string[] = [];
+      registry.subscribe('a', () => received.push('a'));
+      registry.subscribe('b', () => received.push('b'));
+
+      registry.registerActionEntry('multi', async () => {
+        registry.updateStateValue('a', 1);
+        registry.updateStateValue('b', 1);
+        registry.updateStateValue('a', 2);
+        return 'done';
+      }, {});
+
+      await registry.invokeAction('multi');
+      // Both notifications should fire, but 'a' should only fire once (deduped to last value)
+      expect(received).toEqual(['a', 'b']);
+      expect(registry.getStateValue('a')).toBe(2);
+      expect(registry.getStateValue('b')).toBe(1);
+    });
+
+    test('direct updateStateValue notifies synchronously outside action', () => {
+      const registry = createRegistry(baseConfig);
+      registry.registerStateEntry('x', 0, { serializable: true });
+      const received: number[] = [];
+      registry.subscribe('x', (v: unknown) => received.push(v as number));
+
+      registry.updateStateValue('x', 1);
+      expect(received).toEqual([1]);
+
+      registry.updateStateValue('x', 2);
+      expect(received).toEqual([1, 2]);
+    });
+
+    test('subscriptions do not fire during action execution', async () => {
+      const registry = createRegistry(baseConfig);
+      registry.registerStateEntry('status', 'idle', { serializable: true });
+      const updates: string[] = [];
+      registry.subscribe('status', (v: unknown) => updates.push(v as string));
+
+      registry.registerActionEntry('longAction', async () => {
+        registry.updateStateValue('status', 'busy');
+        // Subscriber should NOT have fired yet
+        expect(updates).toEqual([]);
+        return 'done';
+      }, {});
+
+      await registry.invokeAction('longAction');
+      // After action completes, the final notification fires
+      expect(updates).toEqual(['busy']);
+      expect(registry.getStateValue('status')).toBe('busy');
+    });
+
+    test('nested invokeAction within an action batches all updates together', async () => {
+      const registry = createRegistry(baseConfig);
+      registry.registerStateEntry('outer', 'init', { serializable: true });
+      registry.registerStateEntry('inner', 'init', { serializable: true });
+      const updates: Array<{ key: string; value: unknown }> = [];
+      registry.subscribe('outer', (v: unknown) => updates.push({ key: 'outer', value: v }));
+      registry.subscribe('inner', (v: unknown) => updates.push({ key: 'inner', value: v }));
+
+      registry.registerActionEntry('innerAction', async () => {
+        registry.updateStateValue('inner', 'from-inner');
+        return 'done';
+      }, {});
+
+      registry.registerActionEntry('outerAction', async () => {
+        registry.updateStateValue('outer', 'before-inner');
+        await registry.invokeAction('innerAction');
+        registry.updateStateValue('outer', 'after-inner');
+        return 'done';
+      }, {});
+
+      await registry.invokeAction('outerAction');
+      // All updates should be batched into a single flush after outerAction completes
+      expect(updates).toContainEqual({ key: 'outer', value: 'after-inner' });
+      expect(updates).toContainEqual({ key: 'inner', value: 'from-inner' });
+      expect(registry.getStateValue('outer')).toBe('after-inner');
+      expect(registry.getStateValue('inner')).toBe('from-inner');
+    });
+  });
 });

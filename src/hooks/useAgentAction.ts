@@ -22,6 +22,8 @@ export function useAgentAction<TInput, TOutput>(
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
 
+  const deps = options?.deps ?? [name, ctx];
+
   useEffect(() => {
     if (!ctx) return;
     const wrappedHandler = async (input: unknown, actionCtx: ActionContext) => {
@@ -38,7 +40,7 @@ export function useAgentAction<TInput, TOutput>(
     return () => {
       ctx.unregisterActionEntry(name);
     };
-  }, [name, ctx]);
+  }, deps);
 
   const mutateAsync = useCallback(async (input?: TInput): Promise<ActionResult<TOutput>> => {
     if (!ctx) {

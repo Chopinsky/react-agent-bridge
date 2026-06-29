@@ -70,9 +70,8 @@ export interface AgentBridge {
 
 export interface InternalStateEntry {
   descriptor: StateDescriptor;
-  getValue: () => unknown;
-  setValue: (value: unknown) => void;
   refCount: number;
+  value?: unknown;
 }
 
 export interface InternalActionEntry {

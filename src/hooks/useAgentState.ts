@@ -1,5 +1,10 @@
-import { useState, useEffect, useContext, useCallback, useRef } from 'react';
+import { useEffect, useContext, useCallback, useRef } from 'react';
+import { useSyncExternalStore } from 'react';
 import { AgentBridgeCtx } from '../core/AgentBridgeContext';
+
+function getInitialValue<T>(initial: T | (() => T)): T {
+  return typeof initial === 'function' ? (initial as () => T)() : initial;
+}
 
 export function useAgentState<T>(
   key: string,
@@ -14,63 +19,70 @@ export function useAgentState<T>(
   }
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const ctx = useContext(AgentBridgeCtx);
-  const [value, setValue] = useState<T>(initial);
-  const isInternalUpdate = useRef(false);
+
+  const subscribe = useCallback(
+    (cb: () => void) => {
+      if (!ctx) return () => {};
+      return ctx.subscribe(key, cb);
+    },
+    [key, ctx]
+  );
+
+  const getSnapshot = useCallback(
+    () => ctx?.getStateValue(key) as T | undefined,
+    [key, ctx]
+  );
+
+  const registryValue = useSyncExternalStore(subscribe, getSnapshot);
+  const hasRegistryValue = registryValue !== undefined;
+  const value: T = hasRegistryValue ? registryValue : getInitialValue(initial);
+
+  const setValue = useCallback(
+    (newValue: React.SetStateAction<T>) => {
+      if (!ctx) return;
+      const prev = ctx.getStateValue(key);
+      const resolved = typeof newValue === 'function'
+        ? (newValue as (prev: T) => T)(prev as T)
+        : newValue;
+      ctx.updateStateValue(key, resolved);
+    },
+    [key, ctx]
+  );
 
   useEffect(() => {
     if (!ctx) return;
+    if (ctx.getStateValue(key) !== undefined) return;
     ctx.registerStateEntry(key, value, {
       serializable: options?.serializable !== false,
       description: options?.description,
       schema: options?.schema,
       redact: options?.redact,
-      prefix: options?.prefix,
     });
-
-    const unsub = ctx.subscribe(key, (v: unknown) => {
-      if (!isInternalUpdate.current) {
-        setValue(v as T);
-      }
-    });
-
     return () => {
-      unsub();
       ctx.unregisterStateEntry(key);
     };
-  }, []);
+  }, [key, ctx, options?.serializable, options?.description, options?.schema, options?.redact]);
 
-  const syncValue = useCallback((newValue: React.SetStateAction<T>) => {
-    setValue((prev) => {
-      const resolved = typeof newValue === 'function'
-        ? (newValue as (prev: T) => T)(prev)
-        : newValue;
-      isInternalUpdate.current = true;
-      if (ctx) {
-        ctx.updateStateValue(key, resolved);
-      }
-      setTimeout(() => { isInternalUpdate.current = false; });
-      return resolved;
-    });
-  }, [key, ctx]);
-
-  return [value, syncValue];
+  return [value, setValue];
 }
 
-export function useAgentStateValue<T>(key: string): T {
+export function useAgentStateValue<T>(key: string): T | undefined {
   const ctx = useContext(AgentBridgeCtx);
-  const [value, setValue] = useState<T>(() => ctx?.getStateValue(key) as T);
 
-  useEffect(() => {
-    if (!ctx) return;
-    const unsub = ctx.subscribe(key, (v: unknown) => setValue(v as T));
-    const current = ctx.getStateValue(key);
-    if (current !== undefined) {
-      setValue(current as T);
-    }
-    return unsub;
-  }, [key, ctx]);
+  const subscribe = useCallback(
+    (cb: () => void) => {
+      if (!ctx) return () => {};
+      return ctx.subscribe(key, cb);
+    },
+    [key, ctx]
+  );
 
-  return value;
+  const getSnapshot = useCallback(
+    () => ctx?.getStateValue(key) as T | undefined,
+    [key, ctx]
+  );
+
+  return useSyncExternalStore(subscribe, getSnapshot);
 }
 
 export function useSetAgentState<T>(
