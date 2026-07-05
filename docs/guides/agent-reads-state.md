@@ -1,3 +1,9 @@
+---
+title: How Agents Read State
+parent: Guides
+nav_order: 1
+---
+
 # How Agents Read State
 
 This guide explains the complete flow from React component state to the agent-accessible `window.__AGENT__` surface, covering every read pattern an automation client can use.

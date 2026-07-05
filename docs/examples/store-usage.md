@@ -1,3 +1,9 @@
+---
+title: Module Store
+parent: Examples
+nav_order: 4
+---
+
 # Module Store
 
 Source: [`examples/store-usage.tsx`](/react-agent-bridge/blob/master/examples/store-usage.tsx)

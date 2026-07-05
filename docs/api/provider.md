@@ -1,3 +1,9 @@
+---
+title: AgentBridgeProvider
+parent: API Reference
+nav_order: 1
+---
+
 # AgentBridgeProvider
 
 The root provider component. Wraps your React app, creates the internal state/action registry, and attaches `window.__AGENT__` to the global scope for CDP/automation agents.

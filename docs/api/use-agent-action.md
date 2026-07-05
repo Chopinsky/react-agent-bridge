@@ -1,3 +1,9 @@
+---
+title: useAgentAction
+parent: API Reference
+nav_order: 3
+---
+
 # useAgentAction
 
 Register an invocable action handler that CDP agents can call via `window.__AGENT__.actions.invoke()`.

@@ -1,3 +1,9 @@
+---
+title: Production Setup
+parent: Examples
+nav_order: 5
+---
+
 # Production Setup
 
 Source: [`examples/production-setup.tsx`](/react-agent-bridge/blob/master/examples/production-setup.tsx)

@@ -1,3 +1,9 @@
+---
+title: Auth Flow
+parent: Examples
+nav_order: 3
+---
+
 # Auth Flow
 
 Source: [`examples/auth-flow.tsx`](/react-agent-bridge/blob/master/examples/auth-flow.tsx)

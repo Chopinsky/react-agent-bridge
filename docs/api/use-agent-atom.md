@@ -1,3 +1,9 @@
+---
+title: agentAtom / useAgentAtom
+parent: API Reference
+nav_order: 5
+---
+
 # agentAtom / useAgentAtom
 
 A Jotai-inspired atomic state pattern. Create atoms outside components, then use them within components.

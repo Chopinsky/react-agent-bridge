@@ -1,3 +1,9 @@
+---
+title: window.__AGENT__ Surface
+parent: API Reference
+nav_order: 9
+---
+
 # window.__AGENT__ Surface
 
 The public API that CDP/automation agents interact with. Attached to `globalThis` by the `AgentBridgeProvider`.

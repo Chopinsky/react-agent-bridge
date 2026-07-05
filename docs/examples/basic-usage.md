@@ -1,3 +1,9 @@
+---
+title: Basic Counter
+parent: Examples
+nav_order: 1
+---
+
 # Basic Usage — Counter
 
 Source: [`examples/basic-usage.tsx`](/react-agent-bridge/blob/master/examples/basic-usage.tsx)

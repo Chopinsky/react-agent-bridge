@@ -1,3 +1,12 @@
-remote_theme: pages-themes/primer@v0.6.0
+remote_theme: just-the-docs/just-the-docs
 title: react-agent-bridge
 description: Expose React state & actions to CDP/automation agents via window.__AGENT__
+baseurl: /react-agent-bridge
+url: https://chopinsky.github.io
+aux_links:
+  "View on GitHub":
+    - https://github.com/Chopinsky/react-agent-bridge
+search_enabled: true
+heading_anchors: true
+color_scheme: light
+footer_content: "Copyright &copy; 2026. Distributed by an MIT license."

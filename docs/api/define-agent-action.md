@@ -1,3 +1,9 @@
+---
+title: defineAgentAction
+parent: API Reference
+nav_order: 7
+---
+
 # defineAgentAction
 
 Pre-define an action outside of React components for registration via the provider's `registerActions` prop.

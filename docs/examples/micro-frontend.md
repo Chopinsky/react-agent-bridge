@@ -1,3 +1,9 @@
+---
+title: Micro-Frontend Namespacing
+parent: Examples
+nav_order: 6
+---
+
 # Micro-Frontend Namespacing
 
 Source: [`examples/micro-frontend.tsx`](/react-agent-bridge/blob/master/examples/micro-frontend.tsx)

@@ -1,3 +1,9 @@
+---
+title: Production Configuration
+parent: Guides
+nav_order: 2
+---
+
 # Production Configuration
 
 Guidelines for safely deploying `react-agent-bridge` in production environments.

@@ -1,3 +1,9 @@
+---
+title: createAgentStore
+parent: API Reference
+nav_order: 6
+---
+
 # createAgentStore
 
 A Zustand-inspired module-level store. Create a store outside React, then access state from components and non-React code with full agent bridge visibility.

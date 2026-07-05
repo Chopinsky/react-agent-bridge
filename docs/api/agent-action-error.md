@@ -1,3 +1,9 @@
+---
+title: AgentActionError
+parent: API Reference
+nav_order: 8
+---
+
 # AgentActionError
 
 A structured error class for throwing actionable errors from action handlers.

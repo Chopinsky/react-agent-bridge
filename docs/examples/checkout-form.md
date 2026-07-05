@@ -1,3 +1,9 @@
+---
+title: Checkout Form
+parent: Examples
+nav_order: 2
+---
+
 # Checkout Form
 
 Source: [`examples/checkout-form.tsx`](/react-agent-bridge/blob/master/examples/checkout-form.tsx)

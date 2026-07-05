@@ -1,8 +1,12 @@
+---
+layout: home
+title: Home
+nav_order: 1
+---
+
 # react-agent-bridge
 
 Thin React hooks that expose opt-in state and actions to CDP/automation clients via a schema-described registry at `window.__AGENT__`.
-
----
 
 ## Why?
 
@@ -23,7 +27,6 @@ npm install react-agent-bridge
 ```tsx
 import { AgentBridgeProvider, useAgentState, useAgentAction } from 'react-agent-bridge';
 
-// 1. Wrap your app
 function App() {
   return (
     <AgentBridgeProvider appId="my-app">
@@ -32,7 +35,6 @@ function App() {
   );
 }
 
-// 2. Use hooks to expose state & actions
 function Counter() {
   const [count, setCount] = useAgentState('count', 0, {
     description: 'Current counter value',
@@ -47,35 +49,15 @@ function Counter() {
 ```
 
 ```js
-// 3. Agent reads state & invokes actions
 const bridge = window.__AGENT__;
-
-const snapshot = bridge.state.get();          // { count: 0 }
-const count = bridge.state.get('count');      // 0
+const snapshot = bridge.state.get();
+const count = bridge.state.get('count');
 const result = await bridge.actions.invoke('increment');
 ```
 
-## Documentation
+## Next Steps
 
-- [Getting Started](/react-agent-bridge/getting-started)
-- API Reference
-  - [AgentBridgeProvider](/react-agent-bridge/api/provider)
-  - [useAgentState](/react-agent-bridge/api/use-agent-state)
-  - [useAgentAction](/react-agent-bridge/api/use-agent-action)
-  - [useAgentReducer](/react-agent-bridge/api/use-agent-reducer)
-  - [useAgentAtom](/react-agent-bridge/api/use-agent-atom)
-  - [createAgentStore](/react-agent-bridge/api/create-agent-store)
-  - [defineAgentAction](/react-agent-bridge/api/define-agent-action)
-  - [AgentActionError](/react-agent-bridge/api/agent-action-error)
-  - [window.__AGENT__ Surface](/react-agent-bridge/api/window-agent)
-  - [Type Reference](/react-agent-bridge/api/types)
-- Examples
-  - [Basic Counter](/react-agent-bridge/examples/basic-usage)
-  - [Checkout Form](/react-agent-bridge/examples/checkout-form)
-  - [Auth Flow](/react-agent-bridge/examples/auth-flow)
-  - [Module Store](/react-agent-bridge/examples/store-usage)
-  - [Production Setup](/react-agent-bridge/examples/production-setup)
-  - [Micro-Frontend](/react-agent-bridge/examples/micro-frontend)
-- Guides
-  - [How Agents Read State](/react-agent-bridge/guides/agent-reads-state)
-  - [Production Configuration](/react-agent-bridge/guides/production-config)
+- [Getting Started](/react-agent-bridge/getting-started) — full walkthrough
+- [API Reference](/react-agent-bridge/api/) — all hooks, utilities, and types
+- [Examples](/react-agent-bridge/examples/) — runnable code samples
+- [Guides](/react-agent-bridge/guides/) — agent state reading, production config

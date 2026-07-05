@@ -1,3 +1,9 @@
+---
+title: Type Reference
+parent: API Reference
+nav_order: 10
+---
+
 # Type Reference
 
 All TypeScript types exported by `react-agent-bridge`.

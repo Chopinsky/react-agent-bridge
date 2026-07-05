@@ -1,3 +1,9 @@
+---
+title: useAgentReducer
+parent: API Reference
+nav_order: 4
+---
+
 # useAgentReducer
 
 A `useReducer`-style hook that syncs reducer state to the agent bridge.

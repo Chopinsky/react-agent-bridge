@@ -1,3 +1,9 @@
+---
+title: useAgentState
+parent: API Reference
+nav_order: 2
+---
+
 # useAgentState / useAgentStateValue / useSetAgentState
 
 Drop-in `useState` replacement that registers state in the bridge and keeps it in sync.
