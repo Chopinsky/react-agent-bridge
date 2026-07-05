@@ -50,6 +50,7 @@ function PaymentWidget() {
 
 export function ProductionApp() {
   return (
+{% raw %}
     <AgentBridgeProvider
       appId="payment-app"
       enabled={process.env.NODE_ENV === 'development' || process.env.REACT_APP_AGENT_BRIDGE === 'true'}
@@ -64,6 +65,7 @@ export function ProductionApp() {
     >
       <PaymentWidget />
     </AgentBridgeProvider>
+{% endraw %}
   );
 }
 ```

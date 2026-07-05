@@ -55,6 +55,7 @@ interface DevtoolsConfig {
 ### Production-safe
 
 ```tsx
+{% raw %}
 <AgentBridgeProvider
   appId="my-store"
   production={{
@@ -68,6 +69,7 @@ interface DevtoolsConfig {
 >
   <App />
 </AgentBridgeProvider>
+{% endraw %}
 ```
 
 ### With pre-defined actions

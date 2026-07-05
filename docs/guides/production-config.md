@@ -13,12 +13,14 @@ By default, the bridge is **disabled when `NODE_ENV === 'production'`**. The pro
 ## Enabling in production
 
 ```tsx
+{% raw %}
 <AgentBridgeProvider
   appId="my-app"
   production={{
     enabled: true,
   }}
 >
+{% endraw %}
 ```
 
 This enables the bridge in all environments. Use in combination with the security options below.
@@ -28,6 +30,7 @@ This enables the bridge in all environments. Use in combination with the securit
 Require a bearer token for all action invocations:
 
 ```tsx
+{% raw %}
 <AgentBridgeProvider
   appId="payment-app"
   production={{
@@ -35,6 +38,7 @@ Require a bearer token for all action invocations:
     token: process.env.REACT_APP_AGENT_BRIDGE_TOKEN,
   }}
 >
+{% endraw %}
 ```
 
 Agents must provide the token:
@@ -58,6 +62,7 @@ Note: **Reading state does not require a token.** If you need to restrict read a
 Restrict which state keys and actions are exposed:
 
 ```tsx
+{% raw %}
 <AgentBridgeProvider
   appId="my-app"
   production={{
@@ -69,6 +74,7 @@ Restrict which state keys and actions are exposed:
     },
   }}
 >
+{% endraw %}
 ```
 
 **Allowlist rules:**
@@ -84,6 +90,7 @@ Restrict which state keys and actions are exposed:
 Control the bridge via environment variables:
 
 ```tsx
+{% raw %}
 <AgentBridgeProvider
   appId="my-app"
   enabled={process.env.REACT_APP_AGENT_BRIDGE === 'true'}
@@ -92,6 +99,7 @@ Control the bridge via environment variables:
     token: process.env.REACT_APP_AGENT_BRIDGE_TOKEN,
   }}
 >
+{% endraw %}
 ```
 
 This lets you toggle the bridge without redeploying.
